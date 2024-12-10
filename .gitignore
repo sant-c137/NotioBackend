@@ -1,0 +1,56 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django specific
+*.log
+*.pot
+*.pyc
+*.pyo
+*.sqlite3
+db.sqlite3
+/media/
+*.mo
+*.migrations/
+
+# Environments
+.env
+venv/
+env/
+ENV/
+.venv/
+
+# Node.js modules
+node_modules/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Tests
+.coverage
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Static and media files
+/static/
+*.sass-cache
+*.scssc
+*.css.map
+
+# Local settings
+settings_local.py
+
+# Docker
+*.env
+*.pid
+*.seed
+*.backup
+docker-compose.override.yml
