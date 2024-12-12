@@ -27,7 +27,8 @@ from Notio.views import (
     delete_user_note,
     edit_note,
     share_note,
-    get_shared_notes
+    get_shared_notes,
+    edit_shared_note
 )
 
 urlpatterns = [
@@ -42,5 +43,6 @@ urlpatterns = [
     path("api/edit_note/<int:note_id>/", edit_note, name="edit_note"),
     path("api/share_note/", share_note, name="share_note"),
     path("api/get_shared_notes/", get_shared_notes, name="get_shared_notes"),
+    path("api/edit_shared_note/<int:note_id>/", edit_shared_note, name="edit_shared_note"),
 
 ]

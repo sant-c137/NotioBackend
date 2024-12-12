@@ -15,9 +15,8 @@ class Note(models.Model):
     content = models.TextField()
     creation_date = models.DateTimeField()
     last_modification = models.DateTimeField()
-    status = models.CharField(max_length=50, blank=True, null=True)
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-
+    tags = models.ManyToManyField("Tag", through="NoteTag")
     class Meta:
         managed = True
         db_table = "Note"
@@ -34,11 +33,17 @@ class SharedNotes(models.Model):
         managed = True
         db_table = "shared_note"
 
+class Tag(models.Model):
+    tag_id = models.AutoField(primary_key=True)
+    name = models.CharField(unique=True, max_length=100)
 
+    class Meta:
+        managed = True
+        db_table = "Tag"
 
 class NoteTag(models.Model):
-    note = models.ForeignKey(Note, on_delete=models.CASCADE)  # Cambiado a ForeignKey y se agregó on_delete
-    tag = models.ForeignKey("Tag", on_delete=models.CASCADE)  # Se agregó on_delete
+    note = models.ForeignKey(Note, on_delete=models.CASCADE)  
+    tag = models.ForeignKey("Tag", on_delete=models.CASCADE)  
 
     class Meta:
         managed = True
@@ -71,13 +76,7 @@ class SharedNotes(models.Model):
         db_table = "Shared_notes"
 
 
-class Tag(models.Model):
-    tag_id = models.AutoField(primary_key=True)
-    name = models.CharField(unique=True, max_length=100)
 
-    class Meta:
-        managed = True
-        db_table = "Tag"
 
 
 # class AuthUser(models.Model):

@@ -1,17 +1,11 @@
-from django.shortcuts import render
 from django.http import JsonResponse
-from django.contrib.auth import authenticate, login, get_user_model
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-import json
-from django.contrib.auth import logout
-from django.http import JsonResponse
-
-
-from django.shortcuts import get_object_or_404
-from .models import Note, SharedNotes
+from django.contrib.auth import authenticate, login, get_user_model, logout
 from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from django.shortcuts import get_object_or_404
+from .models import Note, SharedNotes, Tag, NoteTag
 import json
 
 
@@ -85,26 +79,55 @@ def get_user_notes(request):
     """
     try:
 
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "User is not authenticated"}, status=403)
+
         user_notes = Note.objects.filter(creator=request.user).order_by(
             "-creation_date"
         )
 
-        notes_list = [
-            {
-                "note_id": note.note_id,
-                "title": note.title,
-                "content": note.content,
-                "creation_date": note.creation_date.isoformat(),
-                "last_modification": note.last_modification.isoformat(),
-                "status": note.status,
-            }
-            for note in user_notes
-        ]
+        if not user_notes.exists():
+            return JsonResponse({"notes": [], "count": 0}, status=200)
+
+        notes_list = []
+        for note in user_notes:
+            try:
+                notes_list.append(
+                    {
+                        "note_id": note.note_id,
+                        "title": note.title,
+                        "content": note.content,
+                        "creation_date": note.creation_date.isoformat(),
+                        "last_modification": note.last_modification.isoformat(),
+                        "tags": [
+                            note_tag.tag.name for note_tag in note.notetag_set.all()
+                        ],
+                    }
+                )
+            except AttributeError as attr_error:
+
+                import logging
+
+                logging.error(f"AttributeError in note processing: {attr_error}")
+                return JsonResponse(
+                    {"error": "Note data is incomplete", "details": str(attr_error)},
+                    status=500,
+                )
 
         return JsonResponse({"notes": notes_list, "count": len(notes_list)}, status=200)
 
+    except Note.DoesNotExist as e:
+
+        import logging
+
+        logging.error(f"Note.DoesNotExist error: {e}")
+        return JsonResponse({"error": "Notes not found"}, status=404)
+
     except Exception as e:
 
+        import logging
+
+        logging.error(f"Unexpected error in get_user_notes: {e}")
         return JsonResponse(
             {"error": "Failed to retrieve notes", "details": str(e)}, status=500
         )
@@ -113,36 +136,67 @@ def get_user_notes(request):
 @login_required
 def create_note(request):
     """
-    Create a new note for the currently logged-in user.
+    Create a new note for the currently logged-in user, with optional tags.
+    Expects XML input, returns JSON errors.
     """
     if request.method == "POST":
         try:
 
-            data = json.loads(request.body)
+            import xml.etree.ElementTree as ET
 
-            if not data.get("title") or not data.get("content"):
+            xml_data = ET.fromstring(request.body)
+
+            title = (
+                xml_data.find("title").text
+                if xml_data.find("title") is not None
+                else None
+            )
+            content = (
+                xml_data.find("content").text
+                if xml_data.find("content") is not None
+                else None
+            )
+
+            tags_elem = xml_data.find("tags")
+            tags = (
+                [tag.text for tag in tags_elem.findall("tag")]
+                if tags_elem is not None
+                else []
+            )
+
+            if not title or not content:
                 return JsonResponse(
                     {"error": "Title and content are required"}, status=400
                 )
 
             new_note = Note.objects.create(
-                title=data["title"],
-                content=data["content"],
+                title=title,
+                content=content,
                 creation_date=timezone.now(),
                 last_modification=timezone.now(),
-                status=data.get("status", ""),
                 creator=request.user,
             )
+
+            if tags:
+                tag_objects = []
+                for tag_name in tags:
+                    tag, created = Tag.objects.get_or_create(name=tag_name.strip())
+                    tag_objects.append(tag)
+
+                NoteTag.objects.bulk_create(
+                    [NoteTag(note=new_note, tag=tag) for tag in tag_objects]
+                )
 
             return JsonResponse(
                 {"message": "Note created successfully", "note_id": new_note.note_id},
                 status=201,
             )
 
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON"}, status=400)
+        except ET.ParseError:
 
+            return JsonResponse({"error": "Invalid XML format"}, status=400)
         except Exception as e:
+
             return JsonResponse(
                 {"error": "Failed to create note", "details": str(e)}, status=500
             )
@@ -178,7 +232,7 @@ def delete_user_note(request, note_id):
 @login_required
 def edit_note(request, note_id):
     """
-    Edit a note for the currently logged-in user.
+    Edit a note for the currently logged-in user, including updating tags.
     """
     try:
         note = Note.objects.get(note_id=note_id, creator=request.user)
@@ -186,11 +240,22 @@ def edit_note(request, note_id):
 
         note.title = data.get("title", note.title)
         note.content = data.get("content", note.content)
-        note.status = data.get("status", note.status)
         note.last_modification = timezone.now()
+
+        tags_data = data.get("tags", [])
+
+        tags = []
+        for tag_name in tags_data:
+            tag, created = Tag.objects.get_or_create(name=tag_name.strip())
+            tags.append(tag)
+
+        note.tags.clear()
+        note.tags.add(*tags)
+
         note.save()
 
         return JsonResponse({"message": "Note updated successfully"}, status=200)
+
     except Note.DoesNotExist:
         return JsonResponse({"error": "Note not found"}, status=404)
     except Exception as e:
@@ -216,18 +281,23 @@ def share_note(request):
 
         if not note_id or not shared_user_email or not permission:
             return JsonResponse(
-                {"error": "note_id, shared_user_email, y permission son requeridos."},
+                {"error": "note_id, shared_user_email, and permission are required."},
                 status=400,
             )
 
         if permission not in ["view", "edit"]:
-            return JsonResponse({"error": "Tipo de permiso inválido."}, status=400)
+            return JsonResponse({"error": "Invalid permission type."}, status=400)
+
+        try:
+            shared_user = User.objects.get(email=shared_user_email)
+        except User.DoesNotExist:
+            return JsonResponse(
+                {"error": f"User with email {shared_user_email} does not exist."},
+                status=404,
+            )
 
         note = get_object_or_404(Note, pk=note_id, creator=request.user)
         print("Note retrieved:", note)
-
-        shared_user = get_object_or_404(User, email=shared_user_email)
-        print("Shared user:", shared_user)
 
         shared_note, created = SharedNotes.objects.get_or_create(
             note=note,
@@ -242,37 +312,38 @@ def share_note(request):
 
         return JsonResponse(
             {
-                "message": f"Nota compartida con éxito con {shared_user_email} con permiso {permission}."
+                "message": f"Note successfully shared with {shared_user_email} with {permission} permission."
             },
             status=200,
         )
     except json.JSONDecodeError as e:
         print("JSON decode error:", e)
-        return JsonResponse(
-            {"error": "Solicitud malformada: JSON inválido."}, status=400
-        )
+        return JsonResponse({"error": "Malformed request: invalid JSON."}, status=400)
     except Exception as e:
         print("Unexpected error:", str(e))
         return JsonResponse(
-            {"error": "Error interno del servidor.", "details": str(e)}, status=500
+            {"error": "Internal server error.", "details": str(e)}, status=500
         )
 
 
 @login_required
 def get_shared_notes(request):
     """
-    Retrieve all notes shared with the currently logged-in user.
+    Retrieve all notes shared with the currently logged-in user, including tags.
     """
     try:
-        shared_notes = SharedNotes.objects.filter(
-            shared_user=request.user
-        ).select_related("note")
+        shared_notes = (
+            SharedNotes.objects.filter(shared_user=request.user)
+            .select_related("note")
+            .prefetch_related("note__tags")
+        )
+
         shared_notes_list = [
             {
-                "note_id": shared_note.note.note_id,
+                "shared_note_id": shared_note.note.note_id,
                 "title": shared_note.note.title,
                 "content": shared_note.note.content,
-                "status": shared_note.note.status,
+                "tags": [tag.name for tag in shared_note.note.tags.all()],
                 "shared_by": shared_note.note.creator.email,
                 "permission": shared_note.permission,
                 "last_modification": shared_note.note.last_modification.isoformat(),
@@ -288,4 +359,54 @@ def get_shared_notes(request):
     except Exception as e:
         return JsonResponse(
             {"error": "Failed to retrieve shared notes", "details": str(e)}, status=500
+        )
+
+
+@login_required
+def edit_shared_note(request, note_id):
+    """
+    Edit a shared note if the currently logged-in user has the 'edit' permission.
+    """
+    try:
+
+        shared_note = SharedNotes.objects.get(
+            note__note_id=note_id, shared_user=request.user
+        )
+
+        if shared_note.permission != "edit":
+            return JsonResponse(
+                {"error": "You do not have permission to edit this note."}, status=403
+            )
+
+        note = shared_note.note
+
+        data = json.loads(request.body)
+
+        note.title = data.get("title", note.title)
+        note.content = data.get("content", note.content)
+        note.last_modification = timezone.now()
+
+        tags_data = data.get("tags", [])
+        if tags_data is not None:
+            tags = []
+            for tag_name in tags_data:
+                tag, created = Tag.objects.get_or_create(name=tag_name.strip())
+                tags.append(tag)
+
+            note.tags.clear()
+            note.tags.add(*tags)
+
+        note.save()
+
+        return JsonResponse({"message": "Shared note updated successfully"}, status=200)
+
+    except SharedNotes.DoesNotExist:
+        return JsonResponse({"error": "Shared note not found"}, status=404)
+    except Note.DoesNotExist:
+        return JsonResponse(
+            {"error": "Note associated with shared note not found"}, status=404
+        )
+    except Exception as e:
+        return JsonResponse(
+            {"error": "Failed to update shared note", "details": str(e)}, status=500
         )
