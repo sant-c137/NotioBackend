@@ -21,18 +21,16 @@ class Note(models.Model):
         managed = True
         db_table = "Note"
 
-
 class SharedNotes(models.Model):
-    shared_note_id = models.AutoField(primary_key=True)  
-    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="shared_notes")  
-    shared_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shared_notes")  
-    permission = models.CharField(max_length=10, choices=[("view", "View"), ("edit", "Edit")])  
-    sharing_date = models.DateTimeField(default=now)  
+    shared_note_id = models.AutoField(primary_key=True)
+    note = models.ForeignKey(Note, models.CASCADE)
+    shared_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    sharing_date = models.DateTimeField()
+    permission = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         managed = True
-        db_table = "shared_note"
-
+        db_table = "Shared_notes"
 class Tag(models.Model):
     tag_id = models.AutoField(primary_key=True)
     name = models.CharField(unique=True, max_length=100)
@@ -52,45 +50,5 @@ class NoteTag(models.Model):
 
 
 
-class Session(models.Model):
-    session_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    session_token = models.CharField(unique=True, max_length=255)
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        managed = True
-        db_table = "Session"
 
 
-class SharedNotes(models.Model):
-    shared_note_id = models.AutoField(primary_key=True)
-    note = models.ForeignKey(Note, models.CASCADE)
-    shared_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    sharing_date = models.DateTimeField()
-    permission = models.CharField(max_length=50, blank=True, null=True)
-
-    class Meta:
-        managed = True
-        db_table = "Shared_notes"
-
-
-
-
-
-# class AuthUser(models.Model):
-#     password = models.CharField(max_length=128)
-#     last_login = models.DateTimeField(blank=True, null=True)
-#     is_superuser = models.BooleanField()
-#     username = models.CharField(unique=True, max_length=150)
-#     first_name = models.CharField(max_length=150)
-#     last_name = models.CharField(max_length=150)
-#     email = models.CharField(max_length=254)
-#     is_staff = models.BooleanField()
-#     is_active = models.BooleanField()
-#     date_joined = models.DateTimeField()
-
-#     class Meta:
-#         managed = True
-#         db_table = "auth_user"

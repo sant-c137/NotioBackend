@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-
+from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,8 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
-# Application definition
+SITE_ID = 1
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -38,7 +37,25 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "Notio",
+    'corsheaders',
+    'rest_framework',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'rest_framework.authtoken',
 ]
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [            'profile',            'email'        ],
+        "AUTH_PARAMS": {"access_type": "online"},
+        "OAUTH_PKCE_ENABLED": True
+        ,
+        "FETCH_USERINFO": True,
+    }
+}
+
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -50,6 +67,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 CORS_ALLOW_ALL_ORIGINS = False
@@ -68,9 +86,9 @@ CORS_ALLOW_HEADERS = [
     "origin",
     "x-requested-with",
     "x-csrftoken",
-    "cookie",  # Añade esta línea
-    "csrftoken",  # Añade esta línea
-    "sessionid",  # Añade esta línea
+    "cookie",  
+    "csrftoken",  
+    "sessionid",  
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -149,6 +167,20 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REST_FRAMEWORK = {
+  "DEFAULT_AUTHENTICATION_CLASES": {
+    "rest_framework_simplejwt.authentication.JWTAuthentication"
+  },
+  "DEFAULT_PERMISSION_CLASES": [
+    "rest_framework_permissions.IsAuthenticated"
+    ]
+  
+}
+
+SIMPLE_JWT = {
+  "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+  "REFRESH_TOKEN_LIFETIME": timedelta(days=30)
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -170,4 +202,19 @@ STATIC_URL = "static/"
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+LOGIN_REDIRECT_URL = '/callback/'
+LOGIN_REDIRECT_URL = 'http://localhost:5173/notes'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['email', 'profile'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+        'OAUTH_PKCE_ENABLED': True,
+        'FETCH_USERINFO': True,
+    }
+}
+
+SOCIALACCOUNT_STORE_TOKENS = True

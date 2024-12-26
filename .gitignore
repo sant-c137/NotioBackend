@@ -54,3 +54,8 @@ settings_local.py
 *.seed
 *.backup
 docker-compose.override.yml
+
+service_account.json
+backup
+backup.bat
+google_oauth_config.json

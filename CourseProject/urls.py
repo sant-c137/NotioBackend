@@ -16,26 +16,15 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
-from Notio.views import (
-    get_user_notes,
-    login_view,
-    register_view,
-    check_session,
-    logout_view,
-    create_note,
-    delete_user_note,
-    edit_note,
-    share_note,
-    get_shared_notes,
-    edit_shared_note
-)
+from django.urls import path, include
+from Notio.views import *
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/login/", login_view, name="login"),
-    path("api/logout/", logout_view, name="logout"),
     path("api/register/", register_view, name="register"),
+    path("api/logout/", logout_view, name="logout"),
     path("api/check_session/", check_session, name="check_session"),
     path("api/get_user_notes/", get_user_notes, name="User notes view"),
     path("api/create_note/", create_note, name="create_note"),
@@ -44,5 +33,14 @@ urlpatterns = [
     path("api/share_note/", share_note, name="share_note"),
     path("api/get_shared_notes/", get_shared_notes, name="get_shared_notes"),
     path("api/edit_shared_note/<int:note_id>/", edit_shared_note, name="edit_shared_note"),
+    
+    path('api/user/register/', UserCreate.as_view(), name='user_create'),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api-auth/', include('rest_framework.urls')),
+    path('accounts/', include('allauth.urls')),
+    path('callback/', google_login_callback, name='callback'),
+    path('api/auth/user/', UserDetailView.as_view(), name='user_detail'),
+    path('api/google/validate_token/', validate_google_token, name='validate_token'),
 
 ]
